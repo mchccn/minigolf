@@ -9,9 +9,26 @@
                 margin: 0;
             }
 
-            canvas {
-                width: 100%;
+            html {
                 height: 100%;
+                overflow: hidden;
+            }
+
+            body {
+                display: grid;
+                place-items: center;
+                background-color: black;
+                height: 100%;
+            }
+
+            canvas {
+                box-sizing: border-box;
+                display: block;
+                margin: auto;
+                width: 100vw;
+                height: 56.25vw;
+                max-width: 177.7vh;
+                max-height: 100vh;
                 background-color: #339a01;
             }
         </style>
