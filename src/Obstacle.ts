@@ -1,14 +1,18 @@
 import { ctx } from ".";
-
-function rotate([cx, cy]: [cx: number, cy: number], a: number) {
-    return [cx * Math.cos(a) - cy * Math.sin(a), cy * Math.cos(a) + cx * Math.sin(a)];
-}
+import { Point, rotate } from "./utils";
 
 export default class Obstacle {
-    public vertices = [];
+    public vertices: [Point, Point, Point, Point];
 
-    constructor(public x: number, public y: number, public width: number, public height: number, a: number) {
-        this.vertices = [];
+    constructor(public x: number, public y: number, public w: number, public h: number, public a: number) {
+        this.vertices = [
+            [x - w / 2, y - h / 2],
+            [x - w / 2, y + h / 2],
+            [x + w / 2, y + h / 2],
+            [x + w / 2, y - h / 2],
+        ];
+
+        for (const v of this.vertices) rotate(v, [x, y], a);
     }
 
     public update() {
@@ -18,6 +22,14 @@ export default class Obstacle {
     public draw() {
         ctx.fillStyle = "black";
 
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.beginPath();
+
+        ctx.moveTo(this.vertices[0][0], this.vertices[0][1]);
+
+        for (const [x, y] of this.vertices.slice(1)) ctx.lineTo(x, y);
+
+        ctx.closePath();
+
+        ctx.fill();
     }
 }

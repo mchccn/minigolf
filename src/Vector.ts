@@ -97,7 +97,7 @@ export default class Vector {
     /**
      * Gets the dot product of this vector and another vector.
      * @param v Other vector to use.
-     * @see Vector.dot
+     * @see Vector.cross
      */
     public dot(v: Vector) {
         return this.x * v.x + this.y * v.y;
@@ -138,7 +138,7 @@ export default class Vector {
      * @param a Vector to compare.
      */
     public angleTo(a: Vector) {
-        return Math.acos(this.dot(a) / (this.magnitude * a.magnitude));
+        return Math.acos(Math.min(this.dot(a) / (this.magnitude * a.magnitude), 1));
     }
 
     /**

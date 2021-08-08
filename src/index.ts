@@ -1,4 +1,5 @@
 import levels from "./levels";
+import { Point, rotate } from "./utils";
 import Vector from "./Vector";
 
 const canvas = document.querySelector("canvas")!;
@@ -13,7 +14,9 @@ let Ω = 0;
 
 let level = 0;
 
-let { player, obstacles } = levels[level];
+let { player, obstacles, hole } = Object.create(levels[level]) as typeof levels[number];
+
+let scored = false;
 
 function update(γ: number) {
     if (isPaused) return;
@@ -28,21 +31,116 @@ function update(γ: number) {
 
     obstacles.forEach((obstacle) => obstacle.update());
 
-    if (mouse.isDown) {
+    hole.update();
+
+    if (mouse.isDown && player.stopped) {
         ctx.strokeStyle = "white";
 
+        ctx.beginPath();
+
         ctx.moveTo(player.pos.x, player.pos.y);
-        ctx.lineTo(player.pos.x + (mouse.x - mouse.ox), player.pos.y + (mouse.y - mouse.oy));
+        ctx.lineTo(player.pos.x - mouse.x + mouse.ox, player.pos.y - mouse.y + mouse.oy);
+
+        ctx.closePath();
 
         ctx.stroke();
     }
 
     player.update();
+
+    obstacles.forEach((o) => {
+        const circle = {
+            x: player.pos.x - o.x,
+            y: player.pos.y - o.y,
+            r: player.r,
+        };
+
+        const rect = {
+            x: 0,
+            y: 0,
+            vertices: o.vertices.map(([x, y]) => [x - o.x, y - o.y] as Point),
+            w: o.w,
+            h: o.w,
+            a: o.a,
+        };
+
+        const [nrx, nry] = rotate([circle.x, circle.y], [rect.x, rect.y], -rect.a);
+
+        circle.x = nrx;
+        circle.y = nry;
+
+        rect.vertices = rect.vertices.map((p) => rotate(p, [rect.x, rect.y], -rect.a));
+
+        const intersecting = (() => {
+            const dx = Math.abs(circle.x - rect.x);
+            const dy = Math.abs(circle.y - rect.y);
+
+            if (dx > rect.w / 2 + circle.r) return false;
+
+            if (dy > rect.h / 2 + circle.r) return false;
+
+            if (dx <= rect.w / 2) return true;
+
+            if (dy <= rect.h / 2) return true;
+
+            const d = Math.pow(dx - rect.w / 2, 2) + Math.pow(dy - rect.h / 2, 2);
+
+            return d <= Math.pow(circle.r, 2);
+        })();
+
+        if (intersecting) {
+            const r = new Vector(o.x, o.y);
+
+            const d = Vector.subtract(player.pos, r);
+
+            const ux = new Vector(Math.cos(o.a), Math.sin(o.a));
+            const uy = new Vector(-Math.sin(o.a), Math.cos(o.a));
+
+            const dx = Math.max(-o.w / 2, Math.min(Vector.dot(d, ux), o.w / 2));
+            const dy = Math.max(-o.h / 2, Math.min(Vector.dot(d, uy), o.h / 2));
+
+            const p = r.add(ux.multiply(dx).add(uy.multiply(dy)));
+
+            const n = Vector.subtract(player.pos, p).normalized;
+
+            const u = Vector.multiply(n, Vector.dot(player.vel, n));
+
+            const w = Vector.subtract(player.vel, u);
+
+            player.vel = Vector.subtract(w, u);
+        }
+    });
+
+    const dx = hole.x - player.pos.x;
+    const dy = hole.y - player.pos.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+
+    if (d < hole.r && !scored) {
+        scored = true;
+
+        player.update = () => {};
+
+        setTimeout(() => {
+            const l = Object.create(levels[++level]) as typeof levels[number];
+
+            if (!l) {
+                clearInterval(interval);
+
+                return console.log("YOU WIN!");
+            }
+
+            player = l.player;
+            obstacles = l.obstacles;
+            hole = l.hole;
+
+            scored = false;
+        }, 250);
+    }
 }
 
 let isPaused = false;
 
-setInterval(() => update(Date.now() - EPOCH), 1000 / 60);
+let interval = setInterval(() => update(Date.now() - EPOCH), 1000 / 60);
 
 const mouse = {
     x: 0,
@@ -55,6 +153,11 @@ const mouse = {
 
 window.addEventListener("mousemove", (e) => {
     Object.assign(mouse, getMousePos(canvas, e));
+
+    if (!mouse.isDown) {
+        mouse.ox = mouse.x;
+        mouse.oy = mouse.y;
+    }
 });
 
 window.addEventListener("mousedown", (e) => {
@@ -78,10 +181,9 @@ window.addEventListener("mouseup", () => {
 
     const isClick = mouse.x === mouse.ox && mouse.y === mouse.oy;
 
-    if (isClick) return;
+    if (isClick || !player.stopped) return;
 
-    player.acc.add(new Vector(-mouse.x + mouse.ox, -mouse.y + mouse.oy).divide(100));
-    player.vel.add(new Vector(-mouse.x + mouse.ox, -mouse.y + mouse.oy).divide(1000));
+    player.shoot(new Vector(-mouse.x + mouse.ox, -mouse.y + mouse.oy));
 });
 
 window.addEventListener("blur", () => {
